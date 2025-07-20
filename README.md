@@ -54,7 +54,22 @@ Verify Docker installation:
 docker --version
 ```
 
-### 3. Install Kubectl
+### 3. Install Node.js and npm
+
+Node.js and npm (Node Package Manager) are required for our application.
+
+```bash
+sudo apt install nodejs npm -y
+```
+
+Verify Node.js and npm installation:
+
+```bash
+node -v
+npm -v
+```
+
+### 4. Install Kubectl
 
 `kubectl` is the command-line tool for interacting with Kubernetes clusters.
 
@@ -65,7 +80,7 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 kubectl version --client
 ```
 
-### 4. Install Minikube
+### 5. Install Minikube
 
 Minikube allows us to run a single-node Kubernetes cluster locally. We'll use the `docker` driver for simplicity.
 
@@ -125,9 +140,9 @@ First, we'll write a simple Node.js server that our Kubernetes cluster will host
 
    You should see "Hello World!". Press `Ctrl+C` in the terminal running `node server.js` to stop it before proceeding.
 
-### Task 2. Create a Docker Container Image
+### Task 2. Create and Push a Docker Container Image to a Remote Repository
 
-Next, we'll package our Node.js application into a Docker container image.
+Next, we'll package our Node.js application into a Docker container image and push it to a remote registry.
 
 1. Create a file named `Dockerfile`:
 
@@ -140,24 +155,44 @@ Next, we'll package our Node.js application into a Docker container image.
    ```dockerfile
    FROM node:18-alpine # Using a modern, lightweight Node.js image
    EXPOSE 8080
+   # Copy package.json and package-lock.json (even if empty for this app, good practice for future projects)
+   COPY package*.json ./
+   # For this simple "Hello World" app, no external npm dependencies are needed.
+   # If your Node.js app later requires dependencies, you would uncomment/add:
+   # RUN npm install --production
    COPY server.js .
    CMD ["node", "server.js"]
    ```
 
 3. Save the file.
 
-4. Build the Docker image. We'll tag it as `hello-node:v1`.
+4. Log in to your Docker Hub account (or other preferred public registry):
 
    ```bash
-   docker build -t hello-node:v1 .
+   docker login
+   # Enter your Docker Hub username and password when prompted.
+   ```
+
+5. Build the Docker image and tag it with your Docker Hub username and repository name (`hello-node:v1`).
+   **Remember to replace `<YOUR_DOCKERHUB_USERNAME>` with your actual Docker Hub username.**
+
+   ```bash
+   docker build -t <YOUR_DOCKERHUB_USERNAME>/hello-node:v1 .
    ```
 
    This will take some time as Docker downloads the base image.
 
-5. (Optional) Test the Docker image locally:
+6. Push your container image to Docker Hub:
+   **Remember to replace `<YOUR_DOCKERHUB_USERNAME>` with your actual Docker Hub username.**
 
    ```bash
-   docker run -d -p 8080:8080 hello-node:v1
+   docker push <YOUR_DOCKERHUB_USERNAME>/hello-node:v1
+   ```
+
+7. (Optional) Test the Docker image locally (after pushing, if you wish, though the remote pull will be done by Minikube):
+
+   ```bash
+   docker run -d -p 8080:8080 <YOUR_DOCKERHUB_USERNAME>/hello-node:v1
    ```
 
    Then, in another terminal:
@@ -180,7 +215,7 @@ Next, we'll package our Node.js application into a Docker container image.
 
 ### Task 3. Deploy Your Application to Minikube
 
-Now, let's deploy our containerized application to our Minikube cluster.
+Now, let's deploy our containerized application to our Minikube cluster, pulling the image from the remote repository.
 
 1. Verify `kubectl` is configured to use Minikube:
 
@@ -190,13 +225,12 @@ Now, let's deploy our containerized application to our Minikube cluster.
 
    It should show `minikube`. If not, run `kubectl config use-context minikube`.
 
-2. Create a Kubernetes Deployment for our application:
+2. Create a Kubernetes Deployment for our application, using the image from your remote repository.
+   **Remember to replace `<YOUR_DOCKERHUB_USERNAME>` with your actual Docker Hub username.**
 
    ```bash
-   kubectl create deployment hello-node --image=hello-node:v1
+   kubectl create deployment hello-node --image=<YOUR_DOCKERHUB_USERNAME>/hello-node:v1
    ```
-
-   *Note: Since we're using Minikube with the Docker driver, the `hello-node:v1` image is already available in Docker's local image cache, which Minikube can access directly. We don't need a remote registry like Artifact Registry for this local setup.*
 
 3. Check the status of your deployment:
 
@@ -212,7 +246,7 @@ Now, let's deploy our containerized application to our Minikube cluster.
    kubectl get pods
    ```
 
-   You should see a pod named `hello-node-...` in a `Running` status.
+   You should see a pod named `hello-node-...` in a `Running` status. If you still see `ErrImagePull`, double-check your Docker Hub username, the image tag, and ensure the image is publicly accessible or you have configured Minikube to use Docker Hub credentials (though for public repos, it's usually not needed).
 
 ### Task 4. Allow External Traffic (Expose the Service)
 
@@ -283,20 +317,29 @@ Let's simulate an application update.
 3. Save the file.
 
 4. Build a new Docker image, tagging it as `hello-node:v2`:
+   **Remember to replace `<YOUR_DOCKERHUB_USERNAME>` with your actual Docker Hub username.**
 
    ```bash
-   docker build -t hello-node:v2 .
+   docker build -t <YOUR_DOCKERHUB_USERNAME>/hello-node:v2 .
    ```
 
-5. Update your Kubernetes deployment to use the new `v2` image. We'll use `kubectl set image` for a cleaner update.
+5. Push the updated container image to Docker Hub:
+   **Remember to replace `<YOUR_DOCKERHUB_USERNAME>` with your actual Docker Hub username.**
 
    ```bash
-   kubectl set image deployment/hello-node hello-node=hello-node:v2
+   docker push <YOUR_DOCKERHUB_USERNAME>/hello-node:v2
+   ```
+
+6. Update your Kubernetes deployment to use the new `v2` image from your remote repository.
+   **Remember to replace `<YOUR_DOCKERHUB_USERNAME>` with your actual Docker Hub username.**
+
+   ```bash
+   kubectl set image deployment/hello-node hello-node=<YOUR_DOCKERHUB_USERNAME>/hello-node:v2
    ```
 
    This command tells Kubernetes to perform a rolling update, gradually replacing the old `v1` pods with new `v2` pods, ensuring no downtime.
 
-6. Watch the rollout status:
+7. Watch the rollout status:
 
    ```bash
    kubectl rollout status deployment/hello-node
@@ -304,7 +347,7 @@ Let's simulate an application update.
 
    Wait until it reports "deployment "hello-node" successfully rolled out."
 
-7. Verify the new version:
+8. Verify the new version:
 
    ```bash
    curl $(minikube service hello-node --url)
