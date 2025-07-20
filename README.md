@@ -153,7 +153,8 @@ Next, we'll package our Node.js application into a Docker container image and pu
 2. Add the following content to `Dockerfile`:
 
    ```dockerfile
-   FROM node:18-alpine # Using a modern, lightweight Node.js image
+   # Using a modern, lightweight Node.js image
+   FROM node:18-alpine 
    EXPOSE 8080
    # Copy package.json and package-lock.json (even if empty for this app, good practice for future projects)
    COPY package*.json ./
@@ -189,13 +190,13 @@ Next, we'll package our Node.js application into a Docker container image and pu
    docker push <YOUR_DOCKERHUB_USERNAME>/hello-node:v1
    ```
 
-7. (Optional) Test the Docker image locally (after pushing, if you wish, though the remote pull will be done by Minikube):
+7. (Optional) Test the Docker image locally (after pushing, if you wish, though the remote pull will be done by Minikube), this will automatically remove the image once the container is stopped:
 
    ```bash
-   docker run -d -p 8080:8080 <YOUR_DOCKERHUB_USERNAME>/hello-node:v1
+   docker run -d --rm -p 8080:8080 <YOUR_DOCKERHUB_USERNAME>/hello-node:v1
    ```
 
-   Then, in another terminal:
+   Then, run:
 
    ```bash
    curl http://localhost:8080
@@ -362,6 +363,32 @@ Let's simulate an application update.
    ```
 
    Look at the `IMAGE` column, and you'll see `hello-node:v2` for the new pods.
+
+   While kubectl get pods -o wide should ideally show the IMAGE column, if it's not appearing for you, the most definitive way to check the image being used by a specific pod is to describe the pod. This will give you all the detailed information about it, including the container images.
+
+   You can do this with the `kubectl describe` command:
+
+   First, get the full name of one of your `hello-node` pods:
+
+   ```bash
+   kubectl get pods
+   ```
+
+   This will give you output like `hello-node-xxxxxxxxxx-yyyyy`. Copy one of those full names.
+
+   Then, use kubectl describe with that pod name:
+
+   ```bash
+   kubectl describe pod <YOUR_POD_NAME>
+   ```
+
+   For example:
+
+   ```bash
+   kubectl describe pod hello-node-714049816-ztzrb | grep Image:
+   ```
+
+   In the output of kubectl describe, you'll find a section for Containers, and within that, you'll clearly see the Image: field for your `hello-node` container, confirming which version (v1 or v2) it's running.
 
 ## Cleanup
 
